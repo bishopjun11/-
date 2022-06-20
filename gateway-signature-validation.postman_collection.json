@@ -1,0 +1,1652 @@
+{
+	"info": {
+		"_postman_id": "f02a6c41-616c-4fd1-9204-9e012fb93a29",
+		"name": "[gateway]signature-validation",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "获取登陆链接",
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "Cookie",
+						"value": "JSESSIONID=azNeTkHuVaSi-dNrm1plMCbd8-xglU8O1qsuNWbu",
+						"type": "text",
+						"disabled": true
+					},
+					{
+						"key": "spec-login",
+						"value": "spec",
+						"type": "text"
+					}
+				],
+				"url": {
+					"raw": "http://{{host}}{{usr}}/publicrs/oauth/getlogin/app?",
+					"protocol": "http",
+					"host": [
+						"{{host}}{{usr}}"
+					],
+					"path": [
+						"publicrs",
+						"oauth",
+						"getlogin",
+						"app"
+					],
+					"query": [
+						{
+							"key": "redirectUrl",
+							"value": "http://localhost:9010/publicrs/oauth/authauthorize/fic",
+							"disabled": true
+						}
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "登陆",
+			"request": {
+				"auth": {
+					"type": "noauth"
+				},
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"name": "Content-Type",
+						"value": "application/json",
+						"type": "text"
+					},
+					{
+						"key": "spec-login",
+						"value": "spec",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n\t\"username\":\"18938954909\",\n\t\"password\":\"ZTEwYWRjMzk0OWJhNTlhYmJlNTZlMDU3ZjIwZjg4M2U=\"\n}"
+				},
+				"url": {
+					"raw": "http://{{host}}{{sts}}/publicrs/oauth/login/app",
+					"protocol": "http",
+					"host": [
+						"{{host}}{{sts}}"
+					],
+					"path": [
+						"publicrs",
+						"oauth",
+						"login",
+						"app"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "测试报文-put-3w",
+			"event": [
+				{
+					"listen": "prerequest",
+					"script": {
+						"id": "3a3967b4-fd38-4825-b18d-9184ba96ef31",
+						"exec": [
+							"/*\r",
+							"使用前须在postman脚本中添加如下header变量:\r",
+							"content-md5:        {{Md5}}\r",
+							"nonce:              {{Nonce}}\r",
+							"app-key:            {{AppKey}}\r",
+							"signature:          {{Signature}}\r",
+							"signature-headers:  {{SignatureHeaders}}\r",
+							"timestamp:          {{timestamp}}\r",
+							"*/\r",
+							"\r",
+							"// 测试用的secret，直接写死在程序里面了，以后做数据库再说\r",
+							"var appKey = \"Tester-Key\";\r",
+							"var appSecret = \"gateway-test-secret\";\r",
+							"\r",
+							"// 简单模式的签名串，去掉时间信息date和随机盐nonce\r",
+							"// md5针对body为对象（目前只用了Json）使用Base64+MD5形成摘要，body为表单的直接返回空字符串\r",
+							"var md5 = calcMd5();\r",
+							"var date = createDate();\r",
+							"var nonce = createUuid();\r",
+							"var timeStamp = createTimeStamp();\r",
+							"\r",
+							"var textToSign = \"\";\r",
+							"var contentType = \"\";\r",
+							"\r",
+							"if(request.headers[\"content-type\"]){\r",
+							"    contentType = request.headers[\"content-type\"];\r",
+							"}\r",
+							"\r",
+							"// 第一部分：标准Header待签串\r",
+							"// 注意，标准Header待签串中使用的header不能以X-Ca-开头，否则会重复签名\r",
+							"textToSign += request.method + \"\\n\";\r",
+							"textToSign += md5 + \"\\n\";\r",
+							"textToSign += contentType + \"\\n\";\r",
+							"textToSign += timeStamp + \"\\n\";\r",
+							"textToSign += nonce + \"\\n\";\r",
+							"textToSign += appKey + \"\\n\";\r",
+							"\r",
+							"// 第二部分：自定义Header待签串\r",
+							"// 除了将相应的header添加到待签串当中外，还需伴随生成X-Ca-Signature-Headers字段\r",
+							"// 以与自定义Header待签串中(key-value)相同的顺序，形如：key1,key2,...,keyn保存参与计算的key值\r",
+							"var headers = headersToSign();\r",
+							"var signatureHeaders;\r",
+							"var sortedKeys = Array.from(headers.keys()).sort()\r",
+							"for (var headerName of sortedKeys) {\r",
+							"    textToSign += headerName + \":\" + headers.get(headerName) + \"\\n\";\r",
+							"    signatureHeaders = signatureHeaders ? signatureHeaders + \",\" + headerName : headerName;\r",
+							"}\r",
+							"\r",
+							"textToSign += urlToSign();\r",
+							"\r",
+							"console.log(\"\\n **************************************************** \\n\");\r",
+							"console.log(\"textToSign/Raw\\n------------------------\\n\" + textToSign);\r",
+							"var hash = CryptoJS.HmacSHA256(textToSign, appSecret)\r",
+							"console.log(\"hash:\" + hash)\r",
+							"var signature = hash.toString(CryptoJS.enc.Base64)\r",
+							"console.log(\"signature:\" + signature)\r",
+							"\r",
+							"// 向Postman的报文header中写相应的Value字段\r",
+							"pm.globals.set('AppKey', appKey);\r",
+							"pm.globals.set('Md5', md5);\r",
+							"pm.globals.set(\"Signature\", signature);\r",
+							"pm.globals.set(\"SignatureHeaders\", signatureHeaders);\r",
+							"pm.globals.set(\"Nonce\", nonce);\r",
+							"pm.globals.set(\"TimeStamp\", timeStamp);\r",
+							"\r",
+							"// 自定义地添加一些标准Header以外的、参与签名的header\r",
+							"// 对参与签名的Header命名没有要求，但是为了方便编码与调试，建议使用X-Ca-[name]的方式\r",
+							"// 重要报文信息也应当放在X-Ca-[name]的字段中\r",
+							"function headersToSign() {\r",
+							"    var prefix = \"x-ca-\"\r",
+							"    var headers = new Map();\r",
+							"    for (var name in request.headers) {\r",
+							"        // postman设置？request.headers中元素全为小写，故此处程序相应调整（但后端服务器区分大小写）\r",
+							"        name = name.toLowerCase();\r",
+							"        // 跳过签名和签名头两个特殊header，避免重复计算\r",
+							"        // console.log(\"header loop on: \" + name);\r",
+							"        if(name.startsWith(prefix)){\r",
+							"            var value = request.headers[name];\r",
+							"            console.log(\"header addons: key = \" + name + \"value = \" + value);\r",
+							"            headers.set(name, value);\r",
+							"        }\r",
+							"    }\r",
+							"    return headers;\r",
+							"}\r",
+							"\r",
+							"function urlToSign() {\r",
+							"    var params = new Map();\r",
+							"    var contentType = request.headers[\"content-type\"];\r",
+							"    // 针对表单，使用k1=v1&k2=&k3=v3 ... 的格式构造字符串\r",
+							"    if (contentType && contentType.startsWith('application/x-www-form-urlencoded')) {\r",
+							"       for(x in request.data){\r",
+							"           params.set(x, request.data[x]);\r",
+							"       }\r",
+							"    }\r",
+							"    var queryParam = pm.request.url.query.members;\r",
+							"    // [重要！]key-value对必须以key值排序！\r",
+							"    for (let i in queryParam) {\r",
+							"        params.set(queryParam[i].key, queryParam[i].value);\r",
+							"    }\r",
+							"    var sortedKeys = Array.from(params.keys())\r",
+							"    sortedKeys.sort();\r",
+							"    var url = \"\";\r",
+							"    for(var k of pm.request.url.path){\r",
+							"        url = url + \"/\" + k;\r",
+							"    }\r",
+							"    var qs;\r",
+							"    for (var k of sortedKeys) {\r",
+							"        var s = k + \"=\" + params.get(k);\r",
+							"        qs = qs ? qs + \"&\" + s : s;\r",
+							"        // console.log(\"key=\" + k + \" value=\" + params.get(k));\r",
+							"    }\r",
+							"    return qs ? url + \"?\" + qs : url;\r",
+							"}\r",
+							"\r",
+							"// 针对对象（目前只做了Json），采用Base64+MD5的计算方式形成摘要\r",
+							"function calcMd5() {\r",
+							"    var contentType = String(request.headers[\"content-type\"]);\r",
+							"    if (!JSON.stringify(request.data).startsWith('{}') && !contentType.startsWith('application/x-www-form-urlencoded')) {\r",
+							"        var data = request.data;\r",
+							"        var md5 = CryptoJS.MD5(data);\r",
+							"        var md5String = md5.toString(CryptoJS.enc.Base64);\r",
+							"        return md5String;\r",
+							"    } else {\r",
+							"        return \"\";\r",
+							"    }\r",
+							"}\r",
+							"\r",
+							"function createUuid() {\r",
+							"    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {\r",
+							"        var r = Math.random()*16|0, v = c == 'x' ? r : (r&0x3|0x8);\r",
+							"        return v.toString(16);\r",
+							"    });\r",
+							"}\r",
+							"\r",
+							"function createDate(){\r",
+							"    var ret = \"\";\r",
+							"    var date = new Date();\r",
+							"    ret += date.getFullYear().toString();\r",
+							"    ret += \"-\";\r",
+							"    ret += (date.getMonth()+1).toString();\r",
+							"    ret += \"-\";\r",
+							"    ret += (date.getDate()).toString();\r",
+							"    return ret;\r",
+							"}\r",
+							"\r",
+							"function createTimeStamp(){\r",
+							"    return (Date.now()).toString();\r",
+							"}"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "PUT",
+				"header": [
+					{
+						"key": "Content-Type",
+						"name": "Content-Type",
+						"value": "application/x-www-form-urlencoded",
+						"type": "text"
+					},
+					{
+						"key": "content-md5",
+						"type": "text",
+						"value": "{{Md5}}"
+					},
+					{
+						"key": "nonce",
+						"type": "text",
+						"value": "{{Nonce}}"
+					},
+					{
+						"key": "app-key",
+						"type": "text",
+						"value": "{{AppKey}}"
+					},
+					{
+						"key": "signature",
+						"type": "text",
+						"value": "{{Signature}}"
+					},
+					{
+						"key": "x-ca-signature-method",
+						"type": "text",
+						"value": "HmacSHA256"
+					},
+					{
+						"key": "signature-headers",
+						"type": "text",
+						"value": "{{SignatureHeaders}}"
+					},
+					{
+						"key": "x-ca-extended",
+						"type": "text",
+						"value": "extendedInfo"
+					},
+					{
+						"key": "timestamp",
+						"type": "text",
+						"value": "{{TimeStamp}}"
+					},
+					{
+						"key": "x-ca-more",
+						"type": "text",
+						"value": "moreInfo"
+					},
+					{
+						"key": "X-Ca-CapsInfo",
+						"type": "text",
+						"value": "capsInfo"
+					}
+				],
+				"body": {
+					"mode": "urlencoded",
+					"urlencoded": [
+						{
+							"key": "jsonKey03",
+							"value": "JsonValue03",
+							"type": "text"
+						},
+						{
+							"key": "xsonKey01",
+							"value": "JsonValue01",
+							"type": "text"
+						},
+						{
+							"key": "jsonKey04",
+							"value": "JsonValue04",
+							"type": "text"
+						},
+						{
+							"key": "jsonKey02",
+							"value": "JsonValue02",
+							"type": "text"
+						},
+						{
+							"key": "jsonKey05",
+							"value": "31231",
+							"type": "text"
+						}
+					]
+				},
+				"url": {
+					"raw": "http://localhost:8080/test?k1=v1&k2=v2&k6=v6&k5=&k3=v3",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "8080",
+					"path": [
+						"test"
+					],
+					"query": [
+						{
+							"key": "k1",
+							"value": "v1"
+						},
+						{
+							"key": "k2",
+							"value": "v2"
+						},
+						{
+							"key": "k6",
+							"value": "v6"
+						},
+						{
+							"key": "k5",
+							"value": ""
+						},
+						{
+							"key": "k3",
+							"value": "v3"
+						}
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "测试报文-put-3w-emptyBody",
+			"event": [
+				{
+					"listen": "prerequest",
+					"script": {
+						"id": "61dc3d38-7676-4ee7-8c1f-4337f0efc56f",
+						"exec": [
+							"/*\r",
+							"使用前须在postman脚本中添加如下header变量:\r",
+							"content-md5:        {{Md5}}\r",
+							"nonce:              {{Nonce}}\r",
+							"app-key:            {{AppKey}}\r",
+							"signature:          {{Signature}}\r",
+							"signature-headers:  {{SignatureHeaders}}\r",
+							"timestamp:          {{timestamp}}\r",
+							"*/\r",
+							"\r",
+							"// 测试用的secret，直接写死在程序里面了，以后做数据库再说\r",
+							"var appKey = \"Tester-Key\";\r",
+							"var appSecret = \"gateway-test-secret\";\r",
+							"\r",
+							"// 简单模式的签名串，去掉时间信息date和随机盐nonce\r",
+							"// md5针对body为对象（目前只用了Json）使用Base64+MD5形成摘要，body为表单的直接返回空字符串\r",
+							"var md5 = calcMd5();\r",
+							"var date = createDate();\r",
+							"var nonce = createUuid();\r",
+							"var timeStamp = createTimeStamp();\r",
+							"\r",
+							"var textToSign = \"\";\r",
+							"var contentType = \"\";\r",
+							"\r",
+							"if(request.headers[\"content-type\"]){\r",
+							"    contentType = request.headers[\"content-type\"];\r",
+							"}\r",
+							"\r",
+							"// 第一部分：标准Header待签串\r",
+							"// 注意，标准Header待签串中使用的header不能以X-Ca-开头，否则会重复签名\r",
+							"textToSign += request.method + \"\\n\";\r",
+							"textToSign += md5 + \"\\n\";\r",
+							"textToSign += contentType + \"\\n\";\r",
+							"textToSign += timeStamp + \"\\n\";\r",
+							"textToSign += nonce + \"\\n\";\r",
+							"textToSign += appKey + \"\\n\";\r",
+							"\r",
+							"// 第二部分：自定义Header待签串\r",
+							"// 除了将相应的header添加到待签串当中外，还需伴随生成X-Ca-Signature-Headers字段\r",
+							"// 以与自定义Header待签串中(key-value)相同的顺序，形如：key1,key2,...,keyn保存参与计算的key值\r",
+							"var headers = headersToSign();\r",
+							"var signatureHeaders;\r",
+							"var sortedKeys = Array.from(headers.keys()).sort()\r",
+							"for (var headerName of sortedKeys) {\r",
+							"    textToSign += headerName + \":\" + headers.get(headerName) + \"\\n\";\r",
+							"    signatureHeaders = signatureHeaders ? signatureHeaders + \",\" + headerName : headerName;\r",
+							"}\r",
+							"\r",
+							"textToSign += urlToSign();\r",
+							"\r",
+							"console.log(\"\\n **************************************************** \\n\");\r",
+							"console.log(\"textToSign/Raw\\n------------------------\\n\" + textToSign);\r",
+							"var hash = CryptoJS.HmacSHA256(textToSign, appSecret)\r",
+							"console.log(\"hash:\" + hash)\r",
+							"var signature = hash.toString(CryptoJS.enc.Base64)\r",
+							"console.log(\"signature:\" + signature)\r",
+							"\r",
+							"// 向Postman的报文header中写相应的Value字段\r",
+							"pm.globals.set('AppKey', appKey);\r",
+							"pm.globals.set('Md5', md5);\r",
+							"pm.globals.set(\"Signature\", signature);\r",
+							"pm.globals.set(\"SignatureHeaders\", signatureHeaders);\r",
+							"pm.globals.set(\"Nonce\", nonce);\r",
+							"pm.globals.set(\"TimeStamp\", timeStamp);\r",
+							"\r",
+							"// 自定义地添加一些标准Header以外的、参与签名的header\r",
+							"// 对参与签名的Header命名没有要求，但是为了方便编码与调试，建议使用X-Ca-[name]的方式\r",
+							"// 重要报文信息也应当放在X-Ca-[name]的字段中\r",
+							"function headersToSign() {\r",
+							"    var prefix = \"x-ca-\"\r",
+							"    var headers = new Map();\r",
+							"    for (var name in request.headers) {\r",
+							"        // postman设置？request.headers中元素全为小写，故此处程序相应调整（但后端服务器区分大小写）\r",
+							"        name = name.toLowerCase();\r",
+							"        // 跳过签名和签名头两个特殊header，避免重复计算\r",
+							"        // console.log(\"header loop on: \" + name);\r",
+							"        if(name.startsWith(prefix)){\r",
+							"            var value = request.headers[name];\r",
+							"            console.log(\"header addons: key = \" + name + \"value = \" + value);\r",
+							"            headers.set(name, value);\r",
+							"        }\r",
+							"    }\r",
+							"    return headers;\r",
+							"}\r",
+							"\r",
+							"function urlToSign() {\r",
+							"    var params = new Map();\r",
+							"    var contentType = request.headers[\"content-type\"];\r",
+							"    // 针对表单，使用k1=v1&k2=&k3=v3 ... 的格式构造字符串\r",
+							"    if (contentType && contentType.startsWith('application/x-www-form-urlencoded')) {\r",
+							"       for(x in request.data){\r",
+							"           params.set(x, request.data[x]);\r",
+							"       }\r",
+							"    }\r",
+							"    var queryParam = pm.request.url.query.members;\r",
+							"    // [重要！]key-value对必须以key值排序！\r",
+							"    for (let i in queryParam) {\r",
+							"        params.set(queryParam[i].key, queryParam[i].value);\r",
+							"    }\r",
+							"    var sortedKeys = Array.from(params.keys())\r",
+							"    sortedKeys.sort();\r",
+							"    var url = \"\";\r",
+							"    for(var k of pm.request.url.path){\r",
+							"        url = url + \"/\" + k;\r",
+							"    }\r",
+							"    var qs;\r",
+							"    for (var k of sortedKeys) {\r",
+							"        var s = k + \"=\" + params.get(k);\r",
+							"        qs = qs ? qs + \"&\" + s : s;\r",
+							"        // console.log(\"key=\" + k + \" value=\" + params.get(k));\r",
+							"    }\r",
+							"    return qs ? url + \"?\" + qs : url;\r",
+							"}\r",
+							"\r",
+							"// 针对对象（目前只做了Json），采用Base64+MD5的计算方式形成摘要\r",
+							"function calcMd5() {\r",
+							"    var contentType = String(request.headers[\"content-type\"]);\r",
+							"    if (!JSON.stringify(request.data).startsWith('{}') && !contentType.startsWith('application/x-www-form-urlencoded')) {\r",
+							"        var data = request.data;\r",
+							"        var md5 = CryptoJS.MD5(data);\r",
+							"        var md5String = md5.toString(CryptoJS.enc.Base64);\r",
+							"        return md5String;\r",
+							"    } else {\r",
+							"        return \"\";\r",
+							"    }\r",
+							"}\r",
+							"\r",
+							"function createUuid() {\r",
+							"    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {\r",
+							"        var r = Math.random()*16|0, v = c == 'x' ? r : (r&0x3|0x8);\r",
+							"        return v.toString(16);\r",
+							"    });\r",
+							"}\r",
+							"\r",
+							"function createDate(){\r",
+							"    var ret = \"\";\r",
+							"    var date = new Date();\r",
+							"    ret += date.getFullYear().toString();\r",
+							"    ret += \"-\";\r",
+							"    ret += (date.getMonth()+1).toString();\r",
+							"    ret += \"-\";\r",
+							"    ret += (date.getDate()).toString();\r",
+							"    return ret;\r",
+							"}\r",
+							"\r",
+							"function createTimeStamp(){\r",
+							"    return (Date.now()).toString();\r",
+							"}"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "PUT",
+				"header": [
+					{
+						"key": "Content-Type",
+						"name": "Content-Type",
+						"value": "application/x-www-form-urlencoded",
+						"type": "text"
+					},
+					{
+						"key": "content-md5",
+						"type": "text",
+						"value": "{{Md5}}"
+					},
+					{
+						"key": "nonce",
+						"type": "text",
+						"value": "{{Nonce}}"
+					},
+					{
+						"key": "app-key",
+						"type": "text",
+						"value": "{{AppKey}}"
+					},
+					{
+						"key": "signature",
+						"type": "text",
+						"value": "{{Signature}}"
+					},
+					{
+						"key": "x-ca-signature-method",
+						"type": "text",
+						"value": "HmacSHA256"
+					},
+					{
+						"key": "signature-headers",
+						"type": "text",
+						"value": "{{SignatureHeaders}}"
+					},
+					{
+						"key": "x-ca-extended",
+						"type": "text",
+						"value": "extendedInfo"
+					},
+					{
+						"key": "timestamp",
+						"type": "text",
+						"value": "{{TimeStamp}}"
+					},
+					{
+						"key": "x-ca-more",
+						"type": "text",
+						"value": "moreInfo"
+					},
+					{
+						"key": "X-Ca-CapsInfo",
+						"type": "text",
+						"value": "capsInfo"
+					}
+				],
+				"url": {
+					"raw": "http://localhost:8080/test",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "8080",
+					"path": [
+						"test"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "测试报文-post-json",
+			"event": [
+				{
+					"listen": "prerequest",
+					"script": {
+						"id": "a83fe1ed-53bf-4947-a1af-359a64e15d2a",
+						"exec": [
+							"/*\r",
+							"使用前须在postman脚本中添加如下header变量:\r",
+							"content-md5:        {{Md5}}\r",
+							"nonce:              {{Nonce}}\r",
+							"app-key:            {{AppKey}}\r",
+							"signature:          {{Signature}}\r",
+							"signature-headers:  {{SignatureHeaders}}\r",
+							"timestamp:          {{timestamp}}\r",
+							"*/\r",
+							"\r",
+							"// 测试用的secret，直接写死在程序里面了，以后做数据库再说\r",
+							"var appKey = \"Tester-Key\";\r",
+							"var appSecret = \"gateway-test-secret\";\r",
+							"\r",
+							"// 简单模式的签名串，去掉时间信息date和随机盐nonce\r",
+							"// md5针对body为对象（目前只用了Json）使用Base64+MD5形成摘要，body为表单的直接返回空字符串\r",
+							"var md5 = calcMd5();\r",
+							"var date = createDate();\r",
+							"var nonce = createUuid();\r",
+							"var timeStamp = createTimeStamp();\r",
+							"\r",
+							"var textToSign = \"\";\r",
+							"var contentType = \"\";\r",
+							"\r",
+							"if(request.headers[\"content-type\"]){\r",
+							"    contentType = request.headers[\"content-type\"];\r",
+							"}\r",
+							"\r",
+							"// 第一部分：标准Header待签串\r",
+							"// 注意，标准Header待签串中使用的header不能以X-Ca-开头，否则会重复签名\r",
+							"textToSign += request.method + \"\\n\";\r",
+							"textToSign += md5 + \"\\n\";\r",
+							"textToSign += contentType + \"\\n\";\r",
+							"textToSign += timeStamp + \"\\n\";\r",
+							"textToSign += nonce + \"\\n\";\r",
+							"textToSign += appKey + \"\\n\";\r",
+							"\r",
+							"// 第二部分：自定义Header待签串\r",
+							"// 除了将相应的header添加到待签串当中外，还需伴随生成X-Ca-Signature-Headers字段\r",
+							"// 以与自定义Header待签串中(key-value)相同的顺序，形如：key1,key2,...,keyn保存参与计算的key值\r",
+							"var headers = headersToSign();\r",
+							"var signatureHeaders;\r",
+							"var sortedKeys = Array.from(headers.keys()).sort()\r",
+							"for (var headerName of sortedKeys) {\r",
+							"    textToSign += headerName + \":\" + headers.get(headerName) + \"\\n\";\r",
+							"    signatureHeaders = signatureHeaders ? signatureHeaders + \",\" + headerName : headerName;\r",
+							"}\r",
+							"\r",
+							"textToSign += urlToSign();\r",
+							"\r",
+							"console.log(\"\\n **************************************************** \\n\");\r",
+							"console.log(\"textToSign/Raw\\n------------------------\\n\" + textToSign);\r",
+							"var hash = CryptoJS.HmacSHA256(textToSign, appSecret)\r",
+							"console.log(\"hash:\" + hash)\r",
+							"var signature = hash.toString(CryptoJS.enc.Base64)\r",
+							"console.log(\"signature:\" + signature)\r",
+							"\r",
+							"// 向Postman的报文header中写相应的Value字段\r",
+							"pm.globals.set('AppKey', appKey);\r",
+							"pm.globals.set('Md5', md5);\r",
+							"pm.globals.set(\"Signature\", signature);\r",
+							"pm.globals.set(\"SignatureHeaders\", signatureHeaders);\r",
+							"pm.globals.set(\"Nonce\", nonce);\r",
+							"pm.globals.set(\"TimeStamp\", timeStamp);\r",
+							"\r",
+							"// 自定义地添加一些标准Header以外的、参与签名的header\r",
+							"// 对参与签名的Header命名没有要求，但是为了方便编码与调试，建议使用X-Ca-[name]的方式\r",
+							"// 重要报文信息也应当放在X-Ca-[name]的字段中\r",
+							"function headersToSign() {\r",
+							"    var prefix = \"x-ca-\"\r",
+							"    var headers = new Map();\r",
+							"    for (var name in request.headers) {\r",
+							"        // postman设置？request.headers中元素全为小写，故此处程序相应调整（但后端服务器区分大小写）\r",
+							"        name = name.toLowerCase();\r",
+							"        // 跳过签名和签名头两个特殊header，避免重复计算\r",
+							"        // console.log(\"header loop on: \" + name);\r",
+							"        if(name.startsWith(prefix)){\r",
+							"            var value = request.headers[name];\r",
+							"            console.log(\"header addons: key = \" + name + \"value = \" + value);\r",
+							"            headers.set(name, value);\r",
+							"        }\r",
+							"    }\r",
+							"    return headers;\r",
+							"}\r",
+							"\r",
+							"function urlToSign() {\r",
+							"    var params = new Map();\r",
+							"    var contentType = request.headers[\"content-type\"];\r",
+							"    // 针对表单，使用k1=v1&k2=&k3=v3 ... 的格式构造字符串\r",
+							"    if (contentType && contentType.startsWith('application/x-www-form-urlencoded')) {\r",
+							"       for(x in request.data){\r",
+							"           params.set(x, request.data[x]);\r",
+							"       }\r",
+							"    }\r",
+							"    var queryParam = pm.request.url.query.members;\r",
+							"    // [重要！]key-value对必须以key值排序！\r",
+							"    for (let i in queryParam) {\r",
+							"        params.set(queryParam[i].key, queryParam[i].value);\r",
+							"    }\r",
+							"    var sortedKeys = Array.from(params.keys())\r",
+							"    sortedKeys.sort();\r",
+							"    var url = \"\";\r",
+							"    for(var k of pm.request.url.path){\r",
+							"        url = url + \"/\" + k;\r",
+							"    }\r",
+							"    var qs;\r",
+							"    for (var k of sortedKeys) {\r",
+							"        var s = k + \"=\" + params.get(k);\r",
+							"        qs = qs ? qs + \"&\" + s : s;\r",
+							"        // console.log(\"key=\" + k + \" value=\" + params.get(k));\r",
+							"    }\r",
+							"    return qs ? url + \"?\" + qs : url;\r",
+							"}\r",
+							"\r",
+							"// 针对对象（目前只做了Json），采用Base64+MD5的计算方式形成摘要\r",
+							"function calcMd5() {\r",
+							"    var contentType = String(request.headers[\"content-type\"]);\r",
+							"    if (!JSON.stringify(request.data).startsWith('{}') && !contentType.startsWith('application/x-www-form-urlencoded')) {\r",
+							"        var data = request.data;\r",
+							"        var md5 = CryptoJS.MD5(data);\r",
+							"        var md5String = md5.toString(CryptoJS.enc.Base64);\r",
+							"        return md5String;\r",
+							"    } else {\r",
+							"        return \"\";\r",
+							"    }\r",
+							"}\r",
+							"\r",
+							"function createUuid() {\r",
+							"    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {\r",
+							"        var r = Math.random()*16|0, v = c == 'x' ? r : (r&0x3|0x8);\r",
+							"        return v.toString(16);\r",
+							"    });\r",
+							"}\r",
+							"\r",
+							"function createDate(){\r",
+							"    var ret = \"\";\r",
+							"    var date = new Date();\r",
+							"    ret += date.getFullYear().toString();\r",
+							"    ret += \"-\";\r",
+							"    ret += (date.getMonth()+1).toString();\r",
+							"    ret += \"-\";\r",
+							"    ret += (date.getDate()).toString();\r",
+							"    return ret;\r",
+							"}\r",
+							"\r",
+							"function createTimeStamp(){\r",
+							"    return (Date.now()).toString();\r",
+							"}"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "content-md5",
+						"value": "{{Md5}}",
+						"type": "text"
+					},
+					{
+						"key": "nonce",
+						"value": "{{Nonce}}",
+						"type": "text"
+					},
+					{
+						"key": "app-key",
+						"value": "{{AppKey}}",
+						"type": "text"
+					},
+					{
+						"key": "signature",
+						"value": "{{Signature}}",
+						"type": "text"
+					},
+					{
+						"key": "x-ca-signature-method",
+						"value": "HmacSHA256",
+						"type": "text"
+					},
+					{
+						"key": "signature-headers",
+						"value": "{{SignatureHeaders}}",
+						"type": "text"
+					},
+					{
+						"key": "x-ca-extended",
+						"value": "extendedInfo",
+						"type": "text"
+					},
+					{
+						"key": "timestamp",
+						"value": "{{TimeStamp}}",
+						"type": "text"
+					},
+					{
+						"key": "x-ca-more",
+						"value": "moreInfo",
+						"type": "text"
+					},
+					{
+						"key": "X-Ca-Caps_Info",
+						"value": "capsInfo",
+						"type": "text"
+					},
+					{
+						"key": "Content-Type",
+						"name": "Content-Type",
+						"value": "application/json",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n\t\"jsonKey03\":\"JsonValue03\",\n\t\"jsonKey01\":\"JsonValue01\",\n\t\"jsonKey04\":\"JsonValue04\",\n\t\"jsonKey02\":\"JsonValue02\",\n\t\"jsonKey05\":31231\n}"
+				},
+				"url": {
+					"raw": "http://localhost:8080/test?k1=v1&k2=v2&k6=v6&k5=&k3=v3",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "8080",
+					"path": [
+						"test"
+					],
+					"query": [
+						{
+							"key": "k1",
+							"value": "v1"
+						},
+						{
+							"key": "k2",
+							"value": "v2"
+						},
+						{
+							"key": "k6",
+							"value": "v6"
+						},
+						{
+							"key": "k5",
+							"value": ""
+						},
+						{
+							"key": "k3",
+							"value": "v3"
+						}
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "测试报文-post-json-emptyBody",
+			"event": [
+				{
+					"listen": "prerequest",
+					"script": {
+						"id": "04cb20f0-033f-4f28-aa66-cffc988474d0",
+						"exec": [
+							"/*\r",
+							"使用前须在postman脚本中添加如下header变量:\r",
+							"content-md5:        {{Md5}}\r",
+							"nonce:              {{Nonce}}\r",
+							"app-key:            {{AppKey}}\r",
+							"signature:          {{Signature}}\r",
+							"signature-headers:  {{SignatureHeaders}}\r",
+							"timestamp:          {{timestamp}}\r",
+							"*/\r",
+							"\r",
+							"// 测试用的secret，直接写死在程序里面了，以后做数据库再说\r",
+							"var appKey = \"Tester-Key\";\r",
+							"var appSecret = \"gateway-test-secret\";\r",
+							"\r",
+							"// 简单模式的签名串，去掉时间信息date和随机盐nonce\r",
+							"// md5针对body为对象（目前只用了Json）使用Base64+MD5形成摘要，body为表单的直接返回空字符串\r",
+							"var md5 = calcMd5();\r",
+							"var date = createDate();\r",
+							"var nonce = createUuid();\r",
+							"var timeStamp = createTimeStamp();\r",
+							"\r",
+							"var textToSign = \"\";\r",
+							"var contentType = \"\";\r",
+							"\r",
+							"if(request.headers[\"content-type\"]){\r",
+							"    contentType = request.headers[\"content-type\"];\r",
+							"}\r",
+							"\r",
+							"// 第一部分：标准Header待签串\r",
+							"// 注意，标准Header待签串中使用的header不能以X-Ca-开头，否则会重复签名\r",
+							"textToSign += request.method + \"\\n\";\r",
+							"textToSign += md5 + \"\\n\";\r",
+							"textToSign += contentType + \"\\n\";\r",
+							"textToSign += timeStamp + \"\\n\";\r",
+							"textToSign += nonce + \"\\n\";\r",
+							"textToSign += appKey + \"\\n\";\r",
+							"\r",
+							"// 第二部分：自定义Header待签串\r",
+							"// 除了将相应的header添加到待签串当中外，还需伴随生成X-Ca-Signature-Headers字段\r",
+							"// 以与自定义Header待签串中(key-value)相同的顺序，形如：key1,key2,...,keyn保存参与计算的key值\r",
+							"var headers = headersToSign();\r",
+							"var signatureHeaders;\r",
+							"var sortedKeys = Array.from(headers.keys()).sort()\r",
+							"for (var headerName of sortedKeys) {\r",
+							"    textToSign += headerName + \":\" + headers.get(headerName) + \"\\n\";\r",
+							"    signatureHeaders = signatureHeaders ? signatureHeaders + \",\" + headerName : headerName;\r",
+							"}\r",
+							"\r",
+							"textToSign += urlToSign();\r",
+							"\r",
+							"console.log(\"\\n **************************************************** \\n\");\r",
+							"console.log(\"textToSign/Raw\\n------------------------\\n\" + textToSign);\r",
+							"var hash = CryptoJS.HmacSHA256(textToSign, appSecret)\r",
+							"console.log(\"hash:\" + hash)\r",
+							"var signature = hash.toString(CryptoJS.enc.Base64)\r",
+							"console.log(\"signature:\" + signature)\r",
+							"\r",
+							"// 向Postman的报文header中写相应的Value字段\r",
+							"pm.globals.set('AppKey', appKey);\r",
+							"pm.globals.set('Md5', md5);\r",
+							"pm.globals.set(\"Signature\", signature);\r",
+							"pm.globals.set(\"SignatureHeaders\", signatureHeaders);\r",
+							"pm.globals.set(\"Nonce\", nonce);\r",
+							"pm.globals.set(\"TimeStamp\", timeStamp);\r",
+							"\r",
+							"// 自定义地添加一些标准Header以外的、参与签名的header\r",
+							"// 对参与签名的Header命名没有要求，但是为了方便编码与调试，建议使用X-Ca-[name]的方式\r",
+							"// 重要报文信息也应当放在X-Ca-[name]的字段中\r",
+							"function headersToSign() {\r",
+							"    var prefix = \"x-ca-\"\r",
+							"    var headers = new Map();\r",
+							"    for (var name in request.headers) {\r",
+							"        // postman设置？request.headers中元素全为小写，故此处程序相应调整（但后端服务器区分大小写）\r",
+							"        name = name.toLowerCase();\r",
+							"        // 跳过签名和签名头两个特殊header，避免重复计算\r",
+							"        // console.log(\"header loop on: \" + name);\r",
+							"        if(name.startsWith(prefix)){\r",
+							"            var value = request.headers[name];\r",
+							"            console.log(\"header addons: key = \" + name + \"value = \" + value);\r",
+							"            headers.set(name, value);\r",
+							"        }\r",
+							"    }\r",
+							"    return headers;\r",
+							"}\r",
+							"\r",
+							"function urlToSign() {\r",
+							"    var params = new Map();\r",
+							"    var contentType = request.headers[\"content-type\"];\r",
+							"    // 针对表单，使用k1=v1&k2=&k3=v3 ... 的格式构造字符串\r",
+							"    if (contentType && contentType.startsWith('application/x-www-form-urlencoded')) {\r",
+							"       for(x in request.data){\r",
+							"           params.set(x, request.data[x]);\r",
+							"       }\r",
+							"    }\r",
+							"    var queryParam = pm.request.url.query.members;\r",
+							"    // [重要！]key-value对必须以key值排序！\r",
+							"    for (let i in queryParam) {\r",
+							"        params.set(queryParam[i].key, queryParam[i].value);\r",
+							"    }\r",
+							"    var sortedKeys = Array.from(params.keys())\r",
+							"    sortedKeys.sort();\r",
+							"    var url = \"\";\r",
+							"    for(var k of pm.request.url.path){\r",
+							"        url = url + \"/\" + k;\r",
+							"    }\r",
+							"    var qs;\r",
+							"    for (var k of sortedKeys) {\r",
+							"        var s = k + \"=\" + params.get(k);\r",
+							"        qs = qs ? qs + \"&\" + s : s;\r",
+							"        // console.log(\"key=\" + k + \" value=\" + params.get(k));\r",
+							"    }\r",
+							"    return qs ? url + \"?\" + qs : url;\r",
+							"}\r",
+							"\r",
+							"// 针对对象（目前只做了Json），采用Base64+MD5的计算方式形成摘要\r",
+							"function calcMd5() {\r",
+							"    var contentType = String(request.headers[\"content-type\"]);\r",
+							"    if (!JSON.stringify(request.data).startsWith('{}') && !contentType.startsWith('application/x-www-form-urlencoded')) {\r",
+							"        var data = request.data;\r",
+							"        var md5 = CryptoJS.MD5(data);\r",
+							"        var md5String = md5.toString(CryptoJS.enc.Base64);\r",
+							"        return md5String;\r",
+							"    } else {\r",
+							"        return \"\";\r",
+							"    }\r",
+							"}\r",
+							"\r",
+							"function createUuid() {\r",
+							"    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {\r",
+							"        var r = Math.random()*16|0, v = c == 'x' ? r : (r&0x3|0x8);\r",
+							"        return v.toString(16);\r",
+							"    });\r",
+							"}\r",
+							"\r",
+							"function createDate(){\r",
+							"    var ret = \"\";\r",
+							"    var date = new Date();\r",
+							"    ret += date.getFullYear().toString();\r",
+							"    ret += \"-\";\r",
+							"    ret += (date.getMonth()+1).toString();\r",
+							"    ret += \"-\";\r",
+							"    ret += (date.getDate()).toString();\r",
+							"    return ret;\r",
+							"}\r",
+							"\r",
+							"function createTimeStamp(){\r",
+							"    return (Date.now()).toString();\r",
+							"}"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "content-type",
+						"name": "Content-Type",
+						"value": "application/json",
+						"type": "text"
+					},
+					{
+						"key": "date",
+						"value": "{{Date}}",
+						"type": "text"
+					},
+					{
+						"key": "content-md5",
+						"value": "{{Md5}}",
+						"type": "text"
+					},
+					{
+						"key": "nonce",
+						"value": "{{Nonce}}",
+						"type": "text"
+					},
+					{
+						"key": "app-key",
+						"value": "{{AppKey}}",
+						"type": "text"
+					},
+					{
+						"key": "signature",
+						"value": "{{Signature}}",
+						"type": "text"
+					},
+					{
+						"key": "x-ca-signature-method",
+						"value": "HmacSHA256",
+						"type": "text"
+					},
+					{
+						"key": "signature-headers",
+						"value": "{{SignatureHeaders}}",
+						"type": "text"
+					},
+					{
+						"key": "x-ca-extended",
+						"value": "extendedInfo",
+						"type": "text"
+					},
+					{
+						"key": "timestamp",
+						"value": "{{TimeStamp}}",
+						"type": "text"
+					},
+					{
+						"key": "x-ca-more",
+						"value": "moreInfo",
+						"type": "text"
+					},
+					{
+						"key": "X-Ca-Caps_Info",
+						"value": "capsInfo",
+						"type": "text"
+					},
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"url": {
+					"raw": "http://localhost:8080/test?k1=v1&k2=v2&k6=v6&k5=&k3=v3",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "8080",
+					"path": [
+						"test"
+					],
+					"query": [
+						{
+							"key": "k1",
+							"value": "v1"
+						},
+						{
+							"key": "k2",
+							"value": "v2"
+						},
+						{
+							"key": "k6",
+							"value": "v6"
+						},
+						{
+							"key": "k5",
+							"value": ""
+						},
+						{
+							"key": "k3",
+							"value": "v3"
+						}
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "测试报文-get",
+			"event": [
+				{
+					"listen": "prerequest",
+					"script": {
+						"id": "10a94a54-8b7c-46ae-917f-c39658b5ca48",
+						"exec": [
+							"/*\r",
+							"使用前须在postman脚本中添加如下header变量:\r",
+							"content-md5:        {{Md5}}\r",
+							"nonce:              {{Nonce}}\r",
+							"app-key:            {{AppKey}}\r",
+							"signature:          {{Signature}}\r",
+							"signature-headers:  {{SignatureHeaders}}\r",
+							"timestamp:          {{timestamp}}\r",
+							"*/\r",
+							"\r",
+							"// 测试用的secret，直接写死在程序里面了，以后做数据库再说\r",
+							"var appKey = \"Tester-Key\";\r",
+							"var appSecret = \"gateway-test-secret\";\r",
+							"\r",
+							"// 简单模式的签名串，去掉时间信息date和随机盐nonce\r",
+							"// md5针对body为对象（目前只用了Json）使用Base64+MD5形成摘要，body为表单的直接返回空字符串\r",
+							"var md5 = calcMd5();\r",
+							"var date = createDate();\r",
+							"var nonce = createUuid();\r",
+							"var timeStamp = createTimeStamp();\r",
+							"\r",
+							"var textToSign = \"\";\r",
+							"var contentType = \"\";\r",
+							"\r",
+							"if(request.headers[\"content-type\"]){\r",
+							"    contentType = request.headers[\"content-type\"];\r",
+							"}\r",
+							"\r",
+							"// 第一部分：标准Header待签串\r",
+							"// 注意，标准Header待签串中使用的header不能以X-Ca-开头，否则会重复签名\r",
+							"textToSign += request.method + \"\\n\";\r",
+							"textToSign += md5 + \"\\n\";\r",
+							"textToSign += contentType + \"\\n\";\r",
+							"textToSign += timeStamp + \"\\n\";\r",
+							"textToSign += nonce + \"\\n\";\r",
+							"textToSign += appKey + \"\\n\";\r",
+							"\r",
+							"// 第二部分：自定义Header待签串\r",
+							"// 除了将相应的header添加到待签串当中外，还需伴随生成X-Ca-Signature-Headers字段\r",
+							"// 以与自定义Header待签串中(key-value)相同的顺序，形如：key1,key2,...,keyn保存参与计算的key值\r",
+							"var headers = headersToSign();\r",
+							"var signatureHeaders;\r",
+							"var sortedKeys = Array.from(headers.keys()).sort()\r",
+							"for (var headerName of sortedKeys) {\r",
+							"    textToSign += headerName + \":\" + headers.get(headerName) + \"\\n\";\r",
+							"    signatureHeaders = signatureHeaders ? signatureHeaders + \",\" + headerName : headerName;\r",
+							"}\r",
+							"\r",
+							"textToSign += urlToSign();\r",
+							"\r",
+							"console.log(\"\\n **************************************************** \\n\");\r",
+							"console.log(\"textToSign/Raw\\n------------------------\\n\" + textToSign);\r",
+							"var hash = CryptoJS.HmacSHA256(textToSign, appSecret)\r",
+							"console.log(\"hash:\" + hash)\r",
+							"var signature = hash.toString(CryptoJS.enc.Base64)\r",
+							"console.log(\"signature:\" + signature)\r",
+							"\r",
+							"// 向Postman的报文header中写相应的Value字段\r",
+							"pm.globals.set('AppKey', appKey);\r",
+							"pm.globals.set('Md5', md5);\r",
+							"pm.globals.set(\"Signature\", signature);\r",
+							"pm.globals.set(\"SignatureHeaders\", signatureHeaders);\r",
+							"pm.globals.set(\"Nonce\", nonce);\r",
+							"pm.globals.set(\"TimeStamp\", timeStamp);\r",
+							"\r",
+							"// 自定义地添加一些标准Header以外的、参与签名的header\r",
+							"// 对参与签名的Header命名没有要求，但是为了方便编码与调试，建议使用X-Ca-[name]的方式\r",
+							"// 重要报文信息也应当放在X-Ca-[name]的字段中\r",
+							"function headersToSign() {\r",
+							"    var prefix = \"x-ca-\"\r",
+							"    var headers = new Map();\r",
+							"    for (var name in request.headers) {\r",
+							"        // postman设置？request.headers中元素全为小写，故此处程序相应调整（但后端服务器区分大小写）\r",
+							"        name = name.toLowerCase();\r",
+							"        // 跳过签名和签名头两个特殊header，避免重复计算\r",
+							"        // console.log(\"header loop on: \" + name);\r",
+							"        if(name.startsWith(prefix)){\r",
+							"            var value = request.headers[name];\r",
+							"            console.log(\"header addons: key = \" + name + \"value = \" + value);\r",
+							"            headers.set(name, value);\r",
+							"        }\r",
+							"    }\r",
+							"    return headers;\r",
+							"}\r",
+							"\r",
+							"function urlToSign() {\r",
+							"    var params = new Map();\r",
+							"    var contentType = request.headers[\"content-type\"];\r",
+							"    // 针对表单，使用k1=v1&k2=&k3=v3 ... 的格式构造字符串\r",
+							"    if (contentType && contentType.startsWith('application/x-www-form-urlencoded')) {\r",
+							"       for(x in request.data){\r",
+							"           params.set(x, request.data[x]);\r",
+							"       }\r",
+							"    }\r",
+							"    var queryParam = pm.request.url.query.members;\r",
+							"    // [重要！]key-value对必须以key值排序！\r",
+							"    for (let i in queryParam) {\r",
+							"        params.set(queryParam[i].key, queryParam[i].value);\r",
+							"    }\r",
+							"    var sortedKeys = Array.from(params.keys())\r",
+							"    sortedKeys.sort();\r",
+							"    var url = \"\";\r",
+							"    for(var k of pm.request.url.path){\r",
+							"        url = url + \"/\" + k;\r",
+							"    }\r",
+							"    var qs;\r",
+							"    for (var k of sortedKeys) {\r",
+							"        var s = k + \"=\" + params.get(k);\r",
+							"        qs = qs ? qs + \"&\" + s : s;\r",
+							"        // console.log(\"key=\" + k + \" value=\" + params.get(k));\r",
+							"    }\r",
+							"    return qs ? url + \"?\" + qs : url;\r",
+							"}\r",
+							"\r",
+							"// 针对对象（目前只做了Json），采用Base64+MD5的计算方式形成摘要\r",
+							"function calcMd5() {\r",
+							"    var contentType = String(request.headers[\"content-type\"]);\r",
+							"    if (!JSON.stringify(request.data).startsWith('{}') && !contentType.startsWith('application/x-www-form-urlencoded')) {\r",
+							"        var data = request.data;\r",
+							"        var md5 = CryptoJS.MD5(data);\r",
+							"        var md5String = md5.toString(CryptoJS.enc.Base64);\r",
+							"        return md5String;\r",
+							"    } else {\r",
+							"        return \"\";\r",
+							"    }\r",
+							"}\r",
+							"\r",
+							"function createUuid() {\r",
+							"    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {\r",
+							"        var r = Math.random()*16|0, v = c == 'x' ? r : (r&0x3|0x8);\r",
+							"        return v.toString(16);\r",
+							"    });\r",
+							"}\r",
+							"\r",
+							"function createDate(){\r",
+							"    var ret = \"\";\r",
+							"    var date = new Date();\r",
+							"    ret += date.getFullYear().toString();\r",
+							"    ret += \"-\";\r",
+							"    ret += (date.getMonth()+1).toString();\r",
+							"    ret += \"-\";\r",
+							"    ret += (date.getDate()).toString();\r",
+							"    return ret;\r",
+							"}\r",
+							"\r",
+							"function createTimeStamp(){\r",
+							"    return (Date.now()).toString();\r",
+							"}"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"protocolProfileBehavior": {
+				"disableBodyPruning": true
+			},
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "content-md5",
+						"value": "{{Md5}}",
+						"type": "text"
+					},
+					{
+						"key": "nonce",
+						"value": "{{Nonce}}",
+						"type": "text"
+					},
+					{
+						"key": "app-key",
+						"value": "{{AppKey}}",
+						"type": "text"
+					},
+					{
+						"key": "signature",
+						"value": "{{Signature}}",
+						"type": "text"
+					},
+					{
+						"key": "x-ca-signature-method",
+						"value": "HmacSHA256",
+						"type": "text"
+					},
+					{
+						"key": "x-ca-extended",
+						"value": "extendedInfo",
+						"type": "text"
+					},
+					{
+						"key": "timestamp",
+						"value": "{{TimeStamp}}",
+						"type": "text"
+					},
+					{
+						"key": "x-ca-more",
+						"value": "moreInfo",
+						"type": "text"
+					},
+					{
+						"key": "X-Ca-CapsInfo",
+						"value": "capsInfo",
+						"type": "text"
+					},
+					{
+						"key": "signature-headers",
+						"value": "{{SignatureHeaders}}",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "formdata",
+					"formdata": []
+				},
+				"url": {
+					"raw": "http://localhost:8080/test?k1=v1&k2=v2&k6=v6&k5=&k3=v3",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "8080",
+					"path": [
+						"test"
+					],
+					"query": [
+						{
+							"key": "k1",
+							"value": "v1"
+						},
+						{
+							"key": "k2",
+							"value": "v2"
+						},
+						{
+							"key": "k6",
+							"value": "v6"
+						},
+						{
+							"key": "k5",
+							"value": ""
+						},
+						{
+							"key": "k3",
+							"value": "v3"
+						}
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "测试报文-delete",
+			"event": [
+				{
+					"listen": "prerequest",
+					"script": {
+						"id": "6d3b1a82-fe53-4d1f-ad69-9998bf1fd876",
+						"exec": [
+							"/*\r",
+							"使用前须在postman脚本中添加如下header变量:\r",
+							"content-md5:        {{Md5}}\r",
+							"nonce:              {{Nonce}}\r",
+							"app-key:            {{AppKey}}\r",
+							"signature:          {{Signature}}\r",
+							"signature-headers:  {{SignatureHeaders}}\r",
+							"timestamp:          {{timestamp}}\r",
+							"*/\r",
+							"\r",
+							"// 测试用的secret，直接写死在程序里面了，以后做数据库再说\r",
+							"var appKey = \"Tester-Key\";\r",
+							"var appSecret = \"gateway-test-secret\";\r",
+							"\r",
+							"// 简单模式的签名串，去掉时间信息date和随机盐nonce\r",
+							"// md5针对body为对象（目前只用了Json）使用Base64+MD5形成摘要，body为表单的直接返回空字符串\r",
+							"var md5 = calcMd5();\r",
+							"var date = createDate();\r",
+							"var nonce = createUuid();\r",
+							"var timeStamp = createTimeStamp();\r",
+							"\r",
+							"var textToSign = \"\";\r",
+							"var contentType = \"\";\r",
+							"\r",
+							"if(request.headers[\"content-type\"]){\r",
+							"    contentType = request.headers[\"content-type\"];\r",
+							"}\r",
+							"\r",
+							"// 第一部分：标准Header待签串\r",
+							"// 注意，标准Header待签串中使用的header不能以X-Ca-开头，否则会重复签名\r",
+							"textToSign += request.method + \"\\n\";\r",
+							"textToSign += md5 + \"\\n\";\r",
+							"textToSign += contentType + \"\\n\";\r",
+							"textToSign += timeStamp + \"\\n\";\r",
+							"textToSign += nonce + \"\\n\";\r",
+							"textToSign += appKey + \"\\n\";\r",
+							"\r",
+							"// 第二部分：自定义Header待签串\r",
+							"// 除了将相应的header添加到待签串当中外，还需伴随生成X-Ca-Signature-Headers字段\r",
+							"// 以与自定义Header待签串中(key-value)相同的顺序，形如：key1,key2,...,keyn保存参与计算的key值\r",
+							"var headers = headersToSign();\r",
+							"var signatureHeaders;\r",
+							"var sortedKeys = Array.from(headers.keys()).sort()\r",
+							"for (var headerName of sortedKeys) {\r",
+							"    textToSign += headerName + \":\" + headers.get(headerName) + \"\\n\";\r",
+							"    signatureHeaders = signatureHeaders ? signatureHeaders + \",\" + headerName : headerName;\r",
+							"}\r",
+							"\r",
+							"textToSign += urlToSign();\r",
+							"\r",
+							"console.log(\"\\n **************************************************** \\n\");\r",
+							"console.log(\"textToSign/Raw\\n------------------------\\n\" + textToSign);\r",
+							"var hash = CryptoJS.HmacSHA256(textToSign, appSecret)\r",
+							"console.log(\"hash:\" + hash)\r",
+							"var signature = hash.toString(CryptoJS.enc.Base64)\r",
+							"console.log(\"signature:\" + signature)\r",
+							"\r",
+							"// 向Postman的报文header中写相应的Value字段\r",
+							"pm.globals.set('AppKey', appKey);\r",
+							"pm.globals.set('Md5', md5);\r",
+							"pm.globals.set(\"Signature\", signature);\r",
+							"pm.globals.set(\"SignatureHeaders\", signatureHeaders);\r",
+							"pm.globals.set(\"Nonce\", nonce);\r",
+							"pm.globals.set(\"TimeStamp\", timeStamp);\r",
+							"\r",
+							"// 自定义地添加一些标准Header以外的、参与签名的header\r",
+							"// 对参与签名的Header命名没有要求，但是为了方便编码与调试，建议使用X-Ca-[name]的方式\r",
+							"// 重要报文信息也应当放在X-Ca-[name]的字段中\r",
+							"function headersToSign() {\r",
+							"    var prefix = \"x-ca-\"\r",
+							"    var headers = new Map();\r",
+							"    for (var name in request.headers) {\r",
+							"        // postman设置？request.headers中元素全为小写，故此处程序相应调整（但后端服务器区分大小写）\r",
+							"        name = name.toLowerCase();\r",
+							"        // 跳过签名和签名头两个特殊header，避免重复计算\r",
+							"        // console.log(\"header loop on: \" + name);\r",
+							"        if(name.startsWith(prefix)){\r",
+							"            var value = request.headers[name];\r",
+							"            console.log(\"header addons: key = \" + name + \"value = \" + value);\r",
+							"            headers.set(name, value);\r",
+							"        }\r",
+							"    }\r",
+							"    return headers;\r",
+							"}\r",
+							"\r",
+							"function urlToSign() {\r",
+							"    var params = new Map();\r",
+							"    var contentType = request.headers[\"content-type\"];\r",
+							"    // 针对表单，使用k1=v1&k2=&k3=v3 ... 的格式构造字符串\r",
+							"    if (contentType && contentType.startsWith('application/x-www-form-urlencoded')) {\r",
+							"       for(x in request.data){\r",
+							"           params.set(x, request.data[x]);\r",
+							"       }\r",
+							"    }\r",
+							"    var queryParam = pm.request.url.query.members;\r",
+							"    // [重要！]key-value对必须以key值排序！\r",
+							"    for (let i in queryParam) {\r",
+							"        params.set(queryParam[i].key, queryParam[i].value);\r",
+							"    }\r",
+							"    var sortedKeys = Array.from(params.keys())\r",
+							"    sortedKeys.sort();\r",
+							"    var url = \"\";\r",
+							"    for(var k of pm.request.url.path){\r",
+							"        url = url + \"/\" + k;\r",
+							"    }\r",
+							"    var qs;\r",
+							"    for (var k of sortedKeys) {\r",
+							"        var s = k + \"=\" + params.get(k);\r",
+							"        qs = qs ? qs + \"&\" + s : s;\r",
+							"        // console.log(\"key=\" + k + \" value=\" + params.get(k));\r",
+							"    }\r",
+							"    return qs ? url + \"?\" + qs : url;\r",
+							"}\r",
+							"\r",
+							"// 针对对象（目前只做了Json），采用Base64+MD5的计算方式形成摘要\r",
+							"function calcMd5() {\r",
+							"    var contentType = String(request.headers[\"content-type\"]);\r",
+							"    if (!JSON.stringify(request.data).startsWith('{}') && !contentType.startsWith('application/x-www-form-urlencoded')) {\r",
+							"        var data = request.data;\r",
+							"        var md5 = CryptoJS.MD5(data);\r",
+							"        var md5String = md5.toString(CryptoJS.enc.Base64);\r",
+							"        return md5String;\r",
+							"    } else {\r",
+							"        return \"\";\r",
+							"    }\r",
+							"}\r",
+							"\r",
+							"function createUuid() {\r",
+							"    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {\r",
+							"        var r = Math.random()*16|0, v = c == 'x' ? r : (r&0x3|0x8);\r",
+							"        return v.toString(16);\r",
+							"    });\r",
+							"}\r",
+							"\r",
+							"function createDate(){\r",
+							"    var ret = \"\";\r",
+							"    var date = new Date();\r",
+							"    ret += date.getFullYear().toString();\r",
+							"    ret += \"-\";\r",
+							"    ret += (date.getMonth()+1).toString();\r",
+							"    ret += \"-\";\r",
+							"    ret += (date.getDate()).toString();\r",
+							"    return ret;\r",
+							"}\r",
+							"\r",
+							"function createTimeStamp(){\r",
+							"    return (Date.now()).toString();\r",
+							"}"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "DELETE",
+				"header": [
+					{
+						"key": "date",
+						"type": "text",
+						"value": "{{Date}}"
+					},
+					{
+						"key": "content-md5",
+						"type": "text",
+						"value": "{{Md5}}"
+					},
+					{
+						"key": "nonce",
+						"type": "text",
+						"value": "{{Nonce}}"
+					},
+					{
+						"key": "app-key",
+						"type": "text",
+						"value": "{{AppKey}}"
+					},
+					{
+						"key": "signature",
+						"type": "text",
+						"value": "{{Signature}}"
+					},
+					{
+						"key": "x-ca-signature-method",
+						"type": "text",
+						"value": "HmacSHA256"
+					},
+					{
+						"key": "x-ca-extended",
+						"type": "text",
+						"value": "extendedInfo"
+					},
+					{
+						"key": "timestamp",
+						"type": "text",
+						"value": "{{TimeStamp}}"
+					},
+					{
+						"key": "x-ca-more",
+						"type": "text",
+						"value": "moreInfo"
+					},
+					{
+						"key": "X-Ca-CapsInfo",
+						"type": "text",
+						"value": "capsInfo"
+					},
+					{
+						"key": "signature-headers",
+						"type": "text",
+						"value": "{{SignatureHeaders}}"
+					}
+				],
+				"url": {
+					"raw": "http://localhost:8080/test?k1=v1&k2=v2&k6=v6&k5=&k3=v3",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "8080",
+					"path": [
+						"test"
+					],
+					"query": [
+						{
+							"key": "k1",
+							"value": "v1"
+						},
+						{
+							"key": "k2",
+							"value": "v2"
+						},
+						{
+							"key": "k6",
+							"value": "v6"
+						},
+						{
+							"key": "k5",
+							"value": ""
+						},
+						{
+							"key": "k3",
+							"value": "v3"
+						}
+					]
+				}
+			},
+			"response": []
+		}
+	]
+}
